@@ -21,9 +21,14 @@ size = comm.Get_size()
 
 internal_simulpar = input_simulation_parameters('simulation_input2.in')
 
-# Dimensões globais
-Gnx, Gny, Gnz = internal_simulpar.mesh
-GLx, GLy, GLz = internal_simulpar.Dom
+# Variáveis globais
+Gnx = internal_simulpar.mesh[0] 
+Gny = internal_simulpar.mesh[1] 
+Gnz = internal_simulpar.mesh[2]
+
+GLx = internal_simulpar.Dom[0]
+GLy = internal_simulpar.Dom[1]
+GLz = internal_simulpar.Dom[2]
 
 # Cada rank vai pegar uma parte de X
 nx_local = Gnx // size
