@@ -1028,7 +1028,48 @@ def coordinates3D(nx, ny, nz, Lx, Ly, Lz, Gnx, Gny, Gnz, GLx, GLy, GLz):
                 idx[idx1D, 2] = k
     return idx, coord
 ###############################################################################
+def coordinates3D_MPI(nx, ny, nz, Lx, Ly, Lz, Gnx, Gny, Gnz, GLx, GLy, GLz, rank):
+    '''Generate the grid coordinates'''
+    dx = GLx / Gnx
+    dy = GLy / Gny
+    dz = GLz / Gnz
+    
+    x = np.linspace(dx/2, Lx-dx/2, nx)
+    y = np.linspace(dy/2, Ly-dy/2, ny)
+    z = np.linspace(dz/2, Lz-dz/2, nz)
+    
+    coord = np.zeros((nx*ny*nz, 3))
+    idx   = np.zeros((nx*ny*nz, 3), dtype = 'int')
+    #for com a quantidade de processos
+    for k in range(nz):
+        for j in range(ny):
+            #if rank == 0
+                #estou na ponta esquerda; eu so tenho vizinho a direita
+                #pegar um cara a mais por ultimo (nx+1)
+                #for i in range(nx+1):
+                #coord[idx1D, 0] = x[i*(rank+1)]
 
+            #elif rank == com_ranksize   
+                #estou na ponta direita; eu so tenho vizinho a esquerda
+                #pegar um cara a mais no inicio (nx+1 e i-1)
+                #for i in range(nx+1):
+                #coord[idx1D, 0] = x[(i*(rank+1)-1)]
+
+            #else 
+                #estou no meio
+                #+2 (nx+2 e i-1)
+                #for i in range(nx+2):
+                #coord[idx1D, 0] = x[(i*(rank+1)-1)]
+
+            for i in range(nx+1):
+                idx1D = idx_3d_to_1d(i,j,k,nx,ny)
+                coord[idx1D, 0] = x[i*(rank+1)]
+                coord[idx1D, 1] = y[j]
+                coord[idx1D, 2] = z[k]
+                idx[idx1D, 0] = i
+                idx[idx1D, 1] = j
+                idx[idx1D, 2] = k
+    return idx, coord
 ###############################################################################
 def plot_pres1D(coord,pos,nx,conduct,pres,data):
     fig = plt.figure(figsize=(15, 4))
