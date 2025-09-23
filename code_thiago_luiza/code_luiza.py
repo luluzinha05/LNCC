@@ -37,7 +37,7 @@ nx_local = Gnx // size
 # Loop que percorre os 4 processos
 ####################################################################
 i = 0
-for p in range(size):
+for _ in range(size):
 
     if rank == i:
         print(f"[Rank {rank}] executando...")

@@ -1028,47 +1028,53 @@ def coordinates3D(nx, ny, nz, Lx, Ly, Lz, Gnx, Gny, Gnz, GLx, GLy, GLz):
                 idx[idx1D, 2] = k
     return idx, coord
 ###############################################################################
-def coordinates3D_MPI(nx, ny, nz, Lx, Ly, Lz, Gnx, Gny, Gnz, GLx, GLy, GLz, rank):
-    '''Generate the grid coordinates'''
+def coordinates3D_MPI(nx, ny, nz, Lx, Ly, Lz, 
+                      Gnx, Gny, Gnz, GLx, GLy, GLz, 
+                      rank, size):
+    """
+    Generate the grid coordinates with ghost cells only in X direction.
+    Cada processo recebe um pedaço no eixo X + células fantasmas.
+    """
     dx = GLx / Gnx
     dy = GLy / Gny
     dz = GLz / Gnz
-    
-    x = np.linspace(dx/2, Lx-dx/2, nx)
-    y = np.linspace(dy/2, Ly-dy/2, ny)
-    z = np.linspace(dz/2, Lz-dz/2, nz)
-    
-    coord = np.zeros((nx*ny*nz, 3))
-    idx   = np.zeros((nx*ny*nz, 3), dtype = 'int')
-    #for com a quantidade de processos
+
+    # Adicionar celulas fantasmas no eixo X:
+    if rank == 0:  
+        # ponta esquerda: ghost apenas à direita
+        nx_local = nx + 1
+        offset_x = 0
+    elif rank == size - 1:  
+        # ponta direita: ghost apenas à esquerda
+        nx_local = nx + 1
+        offset_x = rank * nx - 1
+    else:  
+        # processos no meio: ghost à esquerda e à direita
+        nx_local = nx + 2
+        offset_x = rank * nx - 1
+
+    # Construção das coordenadas locais
+    x = np.linspace(dx/2, Lx - dx/2, Gnx)   # eixo X global
+    y = np.linspace(dy/2, Ly - dy/2, ny)
+    z = np.linspace(dz/2, Lz - dz/2, nz)
+
+    # Cortamos apenas a fatia de X que pertence a este processo
+    x_local = x[offset_x : offset_x + nx_local]
+
+    coord = np.zeros((nx_local * ny * nz, 3))
+    idx   = np.zeros((nx_local * ny * nz, 3), dtype=int)
+
     for k in range(nz):
         for j in range(ny):
-            #if rank == 0
-                #estou na ponta esquerda; eu so tenho vizinho a direita
-                #pegar um cara a mais por ultimo (nx+1)
-                #for i in range(nx+1):
-                #coord[idx1D, 0] = x[i*(rank+1)]
-
-            #elif rank == com_ranksize   
-                #estou na ponta direita; eu so tenho vizinho a esquerda
-                #pegar um cara a mais no inicio (nx+1 e i-1)
-                #for i in range(nx+1):
-                #coord[idx1D, 0] = x[(i*(rank+1)-1)]
-
-            #else 
-                #estou no meio
-                #+2 (nx+2 e i-1)
-                #for i in range(nx+2):
-                #coord[idx1D, 0] = x[(i*(rank+1)-1)]
-
-            for i in range(nx+1):
-                idx1D = idx_3d_to_1d(i,j,k,nx,ny)
-                coord[idx1D, 0] = x[i*(rank+1)]
+            for i in range(nx_local):
+                idx1D = idx_3d_to_1d(i, j, k, nx_local, ny)
+                coord[idx1D, 0] = x_local[i]
                 coord[idx1D, 1] = y[j]
                 coord[idx1D, 2] = z[k]
                 idx[idx1D, 0] = i
                 idx[idx1D, 1] = j
                 idx[idx1D, 2] = k
+
     return idx, coord
 ###############################################################################
 def plot_pres1D(coord,pos,nx,conduct,pres,data):
