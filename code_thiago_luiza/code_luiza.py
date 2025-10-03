@@ -52,7 +52,7 @@ for _ in range(size):
         Y = 10 + 0 * np.random.rand(nx, ny, nz)
         internal_simulpar.BC = DirichletBC3D
 
-        coord, K, psim, dsim, vxsim, vysim, vzsim, divsim = slab3D(internal_simulpar, Y)
+        coord, K, psim, dsim, vxsim, vysim, vzsim, divsim = slab3D(internal_simulpar, Y, rank=rank, size=size)
 
         cfl = 1.0
         day = 86400
@@ -79,7 +79,7 @@ for _ in range(size):
         Y = 10 + 0 * np.random.rand(nx, ny, nz)
         internal_simulpar.BC = DirichletBC3D
 
-        coord, K, psim, dsim, vxsim, vysim, vzsim, divsim = slab3D(internal_simulpar, Y)
+        coord, K, psim, dsim, vxsim, vysim, vzsim, divsim = slab3D(internal_simulpar, Y, rank=rank, size=size)
 
         cfl = 1.0
         day = 86400

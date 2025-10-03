@@ -1043,15 +1043,15 @@ def coordinates3D_MPI(nx, ny, nz, Lx, Ly, Lz,
     if rank == 0:  
         # ponta esquerda: ghost apenas à direita
         nx_local = nx + 1
-        offset_x = 0
+        locghostcell_x = 0
     elif rank == size - 1:  
         # ponta direita: ghost apenas à esquerda
         nx_local = nx + 1
-        offset_x = rank * nx - 1
+        locghostcell_x = rank * nx - 1
     else:  
         # processos no meio: ghost à esquerda e à direita
         nx_local = nx + 2
-        offset_x = rank * nx - 1
+        locghostcell_x = rank * nx - 1
 
     # Construção das coordenadas locais
     x = np.linspace(dx/2, Lx - dx/2, Gnx)   # eixo X global
@@ -1059,7 +1059,8 @@ def coordinates3D_MPI(nx, ny, nz, Lx, Ly, Lz,
     z = np.linspace(dz/2, Lz - dz/2, nz)
 
     # Cortamos apenas a fatia de X que pertence a este processo
-    x_local = x[offset_x : offset_x + nx_local]
+    x_local = x[locghostcell_x : min(locghostcell_x + nx_local, len(x))]
+    nx_local = len(x_local)   
 
     coord = np.zeros((nx_local * ny * nz, 3))
     idx   = np.zeros((nx_local * ny * nz, 3), dtype=int)

@@ -2,7 +2,7 @@
 import sys
 from numpy.linalg import solve
 from scipy.sparse.linalg import spsolve
-from tools import coordinates1D, coordinates2D, coordinates3D, compute_perm
+from tools import coordinates1D, coordinates2D, coordinates3D_MPI, compute_perm
 from tools import compute_trans_1D, setup_system_1D
 from tools import compute_trans_2D, setup_system_2D
 from tools import compute_trans_3D, setup_system_3D
@@ -115,7 +115,7 @@ def slab2D(inputpar,fieldY=0.0,tolerance=1e-6):
 ###############################################################################
 
 ###############################################################################
-def slab3D(inputpar,fieldY=0.0,tolerance=1e-6):
+def slab3D(inputpar,fieldY=0.0,tolerance=1e-6, rank=0, size=1):
     '''Solve the Darcy equation via finite differences'''
     ##########################################################
     # Define the grid ========================================
@@ -125,7 +125,17 @@ def slab3D(inputpar,fieldY=0.0,tolerance=1e-6):
     dy = Ly / ny
     dz = Lz / nz
 
-    idx, coord = coordinates3D(nx, ny, nz, Lx, Ly, Lz)
+    idx, coord = coordinates3D_MPI(nx, ny, nz, Lx, Ly, Lz,
+                                   inputpar.mesh[0], inputpar.mesh[1], inputpar.mesh[2],   # Gnx, Gny, Gnz
+                                   inputpar.Dom[0], inputpar.Dom[1], inputpar.Dom[2],      # GLx, GLy, GLz
+                                   rank, size
+                                  )
+    
+    #imprimir o cord aposimplementaçãodas ghostcells (for i < numerode processos    if rank==i  print processo i    imprimir a variavel cord)
+    for i in range(size):
+        if rank == i:
+            print(f"\n[Rank {rank}] Coordenadas locais (com ghost cells):")
+            print(coord)
     ##########################################################
     beta= inputpar.beta
     rho = inputpar.rho
