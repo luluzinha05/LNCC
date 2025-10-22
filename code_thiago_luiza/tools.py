@@ -1028,56 +1028,6 @@ def coordinates3D(nx, ny, nz, Lx, Ly, Lz, Gnx, Gny, Gnz, GLx, GLy, GLz):
                 idx[idx1D, 2] = k
     return idx, coord
 ###############################################################################
-def coordinates3D_MPI(nx, ny, nz, Lx, Ly, Lz, 
-                      Gnx, Gny, Gnz, GLx, GLy, GLz, 
-                      rank, size):
-    """
-    Generate the grid coordinates with ghost cells only in X direction.
-    Cada processo recebe um pedaço no eixo X + células fantasmas.
-    """
-    dx = GLx / Gnx
-    dy = GLy / Gny
-    dz = GLz / Gnz
-
-    # Adicionar celulas fantasmas no eixo X:
-    if rank == 0:  
-        # ponta esquerda: ghost apenas à direita
-        nx_local = nx + 1
-        locghostcell_x = 0
-    elif rank == size - 1:  
-        # ponta direita: ghost apenas à esquerda
-        nx_local = nx + 1
-        locghostcell_x = rank * nx - 1
-    else:  
-        # processos no meio: ghost à esquerda e à direita
-        nx_local = nx + 2
-        locghostcell_x = rank * nx - 1
-
-    # Construção das coordenadas locais
-    x = np.linspace(dx/2, Lx - dx/2, Gnx)   # eixo X global
-    y = np.linspace(dy/2, Ly - dy/2, ny)
-    z = np.linspace(dz/2, Lz - dz/2, nz)
-
-    # Cortamos apenas a fatia de X que pertence a este processo
-    x_local = x[locghostcell_x : min(locghostcell_x + nx_local, len(x))]
-    nx_local = len(x_local)   
-
-    coord = np.zeros((nx_local * ny * nz, 3))
-    idx   = np.zeros((nx_local * ny * nz, 3), dtype=int)
-
-    for k in range(nz):
-        for j in range(ny):
-            for i in range(nx_local):
-                idx1D = idx_3d_to_1d(i, j, k, nx_local, ny)
-                coord[idx1D, 0] = x_local[i]
-                coord[idx1D, 1] = y[j]
-                coord[idx1D, 2] = z[k]
-                idx[idx1D, 0] = i
-                idx[idx1D, 1] = j
-                idx[idx1D, 2] = k
-
-    return idx, coord
-###############################################################################
 def plot_pres1D(coord,pos,nx,conduct,pres,data):
     fig = plt.figure(figsize=(15, 4))
     ax = fig.add_subplot(131)
@@ -1908,4 +1858,56 @@ def interactive_solution_3D(c_hist, K, dt, Lx, Ly, Lz, ux_val, uy_val, uz_val,IC
                                                      cmin,cmax,kmin,kmax,IC),
              n=IntSlider(min=0, max=nt-1, step=1, value=0, description='Tempo'),
              z_idx=IntSlider(min=0, max=nz-1, step=1, value=0, description='z'))
+###############################################################################
+# A partir daqui serão as implementações para parelização MPI
+###############################################################################
+def coordinates3D_MPI(nx, ny, nz, Lx, Ly, Lz, 
+                      Gnx, Gny, Gnz, GLx, GLy, GLz, 
+                      rank, size):
+    """
+    Generate the grid coordinates with ghost cells only in X direction.
+    Cada processo recebe um pedaço no eixo X + células fantasmas.
+    """
+    dx = GLx / Gnx
+    dy = GLy / Gny
+    dz = GLz / Gnz
+
+    # Adicionar celulas fantasmas no eixo X:
+    if rank == 0:  
+        # ponta esquerda: ghost apenas à direita
+        nx_local = nx + 1
+        locghostcell_x = 0
+    elif rank == size - 1:  
+        # ponta direita: ghost apenas à esquerda
+        nx_local = nx + 1
+        locghostcell_x = rank * nx - 1
+    else:  
+        # processos no meio: ghost à esquerda e à direita
+        nx_local = nx + 2
+        locghostcell_x = rank * nx - 1
+
+    # Construção das coordenadas locais
+    x = np.linspace(dx/2, Lx - dx/2, Gnx)   # eixo X global
+    y = np.linspace(dy/2, Ly - dy/2, ny)
+    z = np.linspace(dz/2, Lz - dz/2, nz)
+
+    # Cortamos apenas a fatia de X que pertence a este processo
+    x_local = x[locghostcell_x : min(locghostcell_x + nx_local, len(x))]
+    nx_local = len(x_local)   
+
+    coord = np.zeros((nx_local * ny * nz, 3))
+    idx   = np.zeros((nx_local * ny * nz, 3), dtype=int)
+
+    for k in range(nz):
+        for j in range(ny):
+            for i in range(nx_local):
+                idx1D = idx_3d_to_1d(i, j, k, nx_local, ny)
+                coord[idx1D, 0] = x_local[i]
+                coord[idx1D, 1] = y[j]
+                coord[idx1D, 2] = z[k]
+                idx[idx1D, 0] = i
+                idx[idx1D, 1] = j
+                idx[idx1D, 2] = k
+
+    return idx, coord
 ###############################################################################
