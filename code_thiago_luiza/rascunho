@@ -1,0 +1,80 @@
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+import numpy as np
+from matplotlib import cm
+from matplotlib.colors import to_rgb
+
+def lighten_color(color, factor):
+    """
+    Clareia uma cor (factor entre 0 e 1).
+    Quanto maior o factor, mais clara a cor.
+    """
+    r, g, b = to_rgb(color)
+    return (r + (1 - r) * factor, g + (1 - g) * factor, b + (1 - b) * factor)
+
+def plot_reservatorio(x, y, z):
+    """
+    Plota o domínio 3D do reservatório (0–x, 0–y, 0–z)
+    com linhas semitransparentes e bolinhas no centro de cada célula.
+    A cor muda a cada Y e clareia conforme Z aumenta.
+    """
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    # --- Divisões inteiras ---
+    xs = np.arange(0, x + 1)
+    ys = np.arange(0, y + 1)
+    zs = np.arange(0, z + 1)
+
+    # --- Linhas da malha ---
+    alpha = 0.3  # 70% transparente
+    for xi in xs:
+        for yi in ys:
+            ax.plot([xi, xi], [yi, yi], [0, z], color='black', alpha=alpha)
+        for zi in zs:
+            ax.plot([xi, xi], [0, y], [zi, zi], color='black', alpha=alpha)
+    for yi in ys:
+        for zi in zs:
+            ax.plot([0, x], [yi, yi], [zi, zi], color='black', alpha=alpha)
+
+    # --- Centros das células ---
+    cx = xs[:-1] + 0.5
+    cy = ys[:-1] + 0.5
+    cz = zs[:-1] + 0.5
+
+    # --- Cria malha dos centros ---
+    Xc, Yc, Zc = np.meshgrid(cx, cy, cz, indexing='ij')
+
+    # --- Paleta base por camada Y ---
+    cmap = cm.viridis(np.linspace(0.1, 0.9, y))  # variação de cores para Y
+
+    # --- Desenha bolinhas coloridas ---
+    for j in range(y):  # cada faixa Y
+        base_color = cmap[j][:3]
+        for k in range(z):  # clareia conforme sobe em Z
+            light_factor = k / (z - 1) if z > 1 else 0
+            color = lighten_color(base_color, light_factor)
+            mask = (Yc[:, j, k] == cy[j]) & (Zc[:, j, k] == cz[k])
+            ax.scatter(Xc[:, j, k], Yc[:, j, k], Zc[:, j, k],
+                       color=color, s=50, edgecolors='k', linewidths=0.3)
+
+    # --- Eixos e proporções ---
+    ax.set_xlim(0, x)
+    ax.set_ylim(0, y)
+    ax.set_zlim(0, z)
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    ax.set_title(f"Domínio 3D do Reservatório ({x} x {y} x {z})")
+
+    ax.set_box_aspect((x, y, z))
+
+    plt.show()
+
+if __name__ == "__main__":
+    # 🔹 Altere aqui os tamanhos
+    X = int(input("Digite o tamanho em X: ") or 12)
+    Y = int(input("Digite o tamanho em Y: ") or 3)
+    Z = int(input("Digite o tamanho em Z: ") or 4)
+
+    plot_reservatorio(X, Y, Z)
