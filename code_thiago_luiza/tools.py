@@ -1,4 +1,5 @@
 ###############################################################################
+from mpi4py import MPI
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.sparse import lil_matrix
@@ -1909,5 +1910,59 @@ def coordinates3D_MPI(nx, ny, nz, Lx, Ly, Lz,
                 idx[idx1D, 1] = j
                 idx[idx1D, 2] = k
 
+    # print("coord: ", coord)
+    # print("idx: ", idx)
     return idx, coord
 ###############################################################################
+def troca_de_mensagens_MPI(comm, rank, size):
+
+    mensagem_enviada = f"Ola do processo {rank}"
+
+    if rank < size - 1:
+        comm.send(mensagem_enviada, dest=rank + 1, tag=0)
+
+    if rank > 0:
+        mensagem_recebida = comm.recv(source=rank - 1, tag=0)
+        print(f"[Rank {rank}] recebeu: '{mensagem_recebida}' do processo {rank - 1}")
+###############################################################################
+def M_Vizinhos1D(comm, rank, size):
+
+    dims = [size]
+    print(f"{dims}")
+    periods = [False]
+    cart = comm.Create_cart(dims, periods=periods, reorder=False)
+
+    coord = cart.Get_coords(rank)[0]
+
+    # Descobre vizinhos
+    src_left, dest_right = cart.Shift(0, +1)
+    src_right, dest_left = cart.Shift(0, -1)
+    
+    return (dest_left, dest_right)
+
+def Identifica_Faces(rank, size, Gny, Gnz, nx_local):
+    count = 0
+    total_faces = Gny * Gnz
+
+    face_direita = np.full(total_faces, -1, dtype=int)
+    face_esquerda = np.full(total_faces, -1, dtype=int)
+
+    if rank == 0 or rank == size:
+        nx_local = nx_local + 1
+    else:
+        nx_local = nx_local + 2
+
+    for k in range(Gnz):
+        for j in range(Gny):
+            if rank != size - 1:
+                face_direita[count] = nx_local * (count + 1)
+            if rank != 0:
+                face_esquerda[count] = (nx_local * (count + 1)) - nx_local
+            count += 1
+
+            # print(nx_local)
+
+    return face_direita, face_esquerda
+###############################################################################
+def get_local_coordinates(id,local_coord):
+    return local_coord[id,:]

@@ -9,6 +9,8 @@ from tools import DirichletBC3D
 from simuladores.slab import slab3D
 from tools import run_advection_solver_3D
 from tools import InitialConditionOilStain
+
+from tools import troca_de_mensagens_MPI, M_Vizinhos1D, Identifica_Faces, get_local_coordinates
 ####################################################################
 
 ####################################################################
@@ -17,6 +19,11 @@ from tools import InitialConditionOilStain
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()  
+
+dest_left, dest_right = M_Vizinhos1D(comm, rank, size)
+print(f"Rank {rank}, dest_left {dest_left}, dest_right {dest_right}")
+
+#troca_de_mensagens_MPI(comm, rank, size)
 ####################################################################
 
 internal_simulpar = input_simulation_parameters('simulation_input2.in')
@@ -32,6 +39,11 @@ GLz = internal_simulpar.Dom[2]
 
 # Cada rank vai pegar uma parte de X
 nx_local = Gnx // size
+
+face_direita, face_esquerda = Identifica_Faces(rank, size, Gny, Gnz, nx_local)
+
+print(f"[Rank {rank}] Face esquerda -> {face_esquerda}")
+print(f"[Rank {rank}] Face direita  -> {face_direita}")
 
 ####################################################################
 # Loop que percorre os 4 processos
@@ -50,9 +62,13 @@ for _ in range(size):
         Lz = GLz
      
         Y = 10 + 0 * np.random.rand(nx, ny, nz)
+
         internal_simulpar.BC = DirichletBC3D
 
         coord, K, psim, dsim, vxsim, vysim, vzsim, divsim = slab3D(internal_simulpar, Y, rank=rank, size=size)
+
+        for j in range(ny * nz):
+            print(f"Rank {rank} ID da face da direita {face_direita[j]} Coordenadas {get_local_coordinates(face_direita[j], coord)}")
 
         cfl = 1.0
         day = 86400
@@ -77,6 +93,7 @@ for _ in range(size):
         Lz = GLz
 
         Y = 10 + 0 * np.random.rand(nx, ny, nz)
+
         internal_simulpar.BC = DirichletBC3D
 
         coord, K, psim, dsim, vxsim, vysim, vzsim, divsim = slab3D(internal_simulpar, Y, rank=rank, size=size)
@@ -104,6 +121,7 @@ for _ in range(size):
         Lz = GLz
 
         Y = 10 + 0 * np.random.rand(nx, ny, nz)
+
         internal_simulpar.BC = DirichletBC3D
 
         coord, K, psim, dsim, vxsim, vysim, vzsim, divsim = slab3D(internal_simulpar, Y)
@@ -131,6 +149,7 @@ for _ in range(size):
         Lz = GLz
 
         Y = 10 + 0 * np.random.rand(nx, ny, nz)
+        
         internal_simulpar.BC = DirichletBC3D
 
         coord, K, psim, dsim, vxsim, vysim, vzsim, divsim = slab3D(internal_simulpar, Y)

@@ -131,11 +131,11 @@ def slab3D(inputpar,fieldY=0.0,tolerance=1e-6, rank=0, size=1):
                                    rank, size
                                   )
     
-    #imprimir o cord aposimplementaçãodas ghostcells (for i < numerode processos    if rank==i  print processo i    imprimir a variavel cord)
-    for i in range(size):
-        if rank == i:
-            print(f"\n[Rank {rank}] Coordenadas locais (com ghost cells):")
-            print(coord)
+    #imprimir o cord apos implementaçãodas ghostcells (for i < numero de processos    if rank==i  print processo i    imprimir a variavel cord)
+    #for i in range(size):
+    #    if rank == i:
+    #        print(f"\n[Rank {rank}] Coordenadas locais (com ghost cells):")
+    #        print(coord)
     ##########################################################
     beta= inputpar.beta
     rho = inputpar.rho
