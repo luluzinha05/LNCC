@@ -1939,7 +1939,7 @@ def M_Vizinhos1D(comm, rank, size):
     src_right, dest_left = cart.Shift(0, -1)
     
     return (dest_left, dest_right)
-
+###############################################################################
 def Identifica_Faces(rank, size, Gny, Gnz, nx_local):
     count = 0
     total_faces = Gny * Gnz
