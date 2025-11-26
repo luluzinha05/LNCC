@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 from scipy.sparse import lil_matrix
 from ipywidgets import interact, IntSlider
 
+from code_thiago_luiza.simuladores.slab import slab3D
+
 # type: ignore
 #import BC_IC_tools as BC_IC
 ###############################################################################
@@ -1966,3 +1968,32 @@ def Identifica_Faces(rank, size, Gny, Gnz, nx_local):
 ###############################################################################
 def get_local_coordinates(id,local_coord):
     return local_coord[id,:]
+###############################################################################
+def P_FaceDireita(inputpar, rank, size, Gny, Gnz, nx_local):
+    _, _, p_reshaped, _, _, _, _, _ = slab3D(
+    inputpar, fieldY=0.0, tolerance=1e-6, rank=rank, size=size
+    )
+
+    # Retorna para o valor plano da pressão
+    p_flat = p_reshaped.flatten(order='F')
+    
+    # 3. Obter os índices da Face Direita
+    face_direita_indices, _ = Identifica_Faces(
+        rank=rank, 
+        size=size, 
+        Gny=Gny, 
+        Gnz=Gnz, 
+        nx_local=nx_local
+    )
+    
+    # Filtra os índices válidos (>= 0)
+    valid_indices = face_direita_indices[face_direita_indices >= 0]
+    
+    if len(valid_indices) > 0:
+        # Pega o valor de P diretamente usando o índice fornecido no p_flat
+        P_face_direita = p_flat[valid_indices]
+        return P_face_direita, valid_indices
+    else:
+        # Se não há face direita neste rank
+        print(f"[Rank {rank}] Não há face direita neste subdomínio.")
+        return np.array([]), np.array([])
