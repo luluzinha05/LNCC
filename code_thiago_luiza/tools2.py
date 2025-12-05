@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 from scipy.sparse import lil_matrix
 from ipywidgets import interact, IntSlider
 
+from code_thiago_luiza.simuladores.slab import slab3D
+
 # type: ignore
 #import BC_IC_tools as BC_IC
 ###############################################################################
@@ -1860,16 +1862,144 @@ def interactive_solution_3D(c_hist, K, dt, Lx, Ly, Lz, ux_val, uy_val, uz_val,IC
              n=IntSlider(min=0, max=nt-1, step=1, value=0, description='Tempo'),
              z_idx=IntSlider(min=0, max=nz-1, step=1, value=0, description='z'))
 ###############################################################################
-
-###############################################################################
 # A partir daqui serão as implementações para parelização MPI
 ###############################################################################
+def coordinates3D_MPI(nx, ny, nz, Lx, Ly, Lz, 
+                      Gnx, Gny, Gnz, GLx, GLy, GLz, 
+                      rank, size):
+    """
+    Generate the grid coordinates with ghost cells only in X direction.
+    Cada processo recebe um pedaço no eixo X + células fantasmas.
+    """
+    dx = GLx / Gnx
+    dy = GLy / Gny
+    dz = GLz / Gnz
 
-import numpy as np
+    # Adicionar celulas fantasmas no eixo X:
+    if rank == 0:  
+        # ponta esquerda: ghost apenas à direita
+        nx_local = nx + 1
+        locghostcell_x = 0
+    elif rank == size - 1:  
+        # ponta direita: ghost apenas à esquerda
+        nx_local = nx + 1
+        locghostcell_x = rank * nx - 1
+    else:  
+        # processos no meio: ghost à esquerda e à direita
+        nx_local = nx + 2
+        locghostcell_x = rank * nx - 1
 
+    # Construção das coordenadas locais
+    x = np.linspace(dx/2, Lx - dx/2, Gnx)   # eixo X global
+    y = np.linspace(dy/2, Ly - dy/2, ny)
+    z = np.linspace(dz/2, Lz - dz/2, nz)
+
+    # Cortamos apenas a fatia de X que pertence a este processo
+    x_local = x[locghostcell_x : min(locghostcell_x + nx_local, len(x))]
+    nx_local = len(x_local)   
+
+    coord = np.zeros((nx_local * ny * nz, 3))
+    idx   = np.zeros((nx_local * ny * nz, 3), dtype=int)
+
+    for k in range(nz):
+        for j in range(ny):
+            for i in range(nx_local):
+                idx1D = idx_3d_to_1d(i, j, k, nx_local, ny)
+                coord[idx1D, 0] = x_local[i]
+                coord[idx1D, 1] = y[j]
+                coord[idx1D, 2] = z[k]
+                idx[idx1D, 0] = i
+                idx[idx1D, 1] = j
+                idx[idx1D, 2] = k
+
+    # print("coord: ", coord)
+    # print("idx: ", idx)
+    return idx, coord
+###############################################################################
+def troca_de_mensagens_MPI(comm, rank, size):
+
+    mensagem_enviada = f"Ola do processo {rank}"
+
+    if rank < size - 1:
+        comm.send(mensagem_enviada, dest=rank + 1, tag=0)
+
+    if rank > 0:
+        mensagem_recebida = comm.recv(source=rank - 1, tag=0)
+        print(f"[Rank {rank}] recebeu: '{mensagem_recebida}' do processo {rank - 1}")
+###############################################################################
+def M_Vizinhos1D(comm, rank, size):
+
+    dims = [size]
+    print(f"{dims}")
+    periods = [False]
+    cart = comm.Create_cart(dims, periods=periods, reorder=False)
+
+    coord = cart.Get_coords(rank)[0]
+
+    # Descobre vizinhos
+    src_left, dest_right = cart.Shift(0, +1)
+    src_right, dest_left = cart.Shift(0, -1)
+    
+    return (dest_left, dest_right)
+###############################################################################
+def Identifica_Faces(rank, size, Gny, Gnz, nx_local):
+    count = 0
+    total_faces = Gny * Gnz
+
+    face_direita = np.full(total_faces, -1, dtype=int)
+    face_esquerda = np.full(total_faces, -1, dtype=int)
+
+    if rank == 0 or rank == size:
+        nx_local = nx_local + 1
+    else:
+        nx_local = nx_local + 2
+
+    for k in range(Gnz):
+        for j in range(Gny):
+            if rank != size - 1:
+                face_direita[count] = nx_local * (count + 1)
+            if rank != 0:
+                face_esquerda[count] = (nx_local * (count + 1)) - nx_local
+            count += 1
+
+            # print(nx_local)
+
+    return face_direita, face_esquerda
+###############################################################################
+def get_local_coordinates(id,local_coord):
+    return local_coord[id,:]
+###############################################################################
+def P_FaceDireita(inputpar, rank, size, Gny, Gnz, nx_local):
+    _, _, p_reshaped, _, _, _, _, _ = slab3D(
+    inputpar, fieldY=0.0, tolerance=1e-6, rank=rank, size=size
+    )
+
+    # Retorna para o valor plano da pressão
+    p_flat = p_reshaped.flatten(order='F')
+    
+    # 3. Obter os índices da Face Direita
+    face_direita_indices, _ = Identifica_Faces(
+        rank=rank, 
+        size=size, 
+        Gny=Gny, 
+        Gnz=Gnz, 
+        nx_local=nx_local
+    )
+    
+    # Filtra os índices válidos (>= 0)
+    valid_indices = face_direita_indices[face_direita_indices >= 0]
+    
+    if len(valid_indices) > 0:
+        # Pega o valor de P diretamente usando o índice fornecido no p_flat
+        P_face_direita = p_flat[valid_indices]
+        return P_face_direita, valid_indices
+    else:
+        # Se não há face direita neste rank
+        print(f"[Rank {rank}] Não há face direita neste subdomínio.")
+        return np.array([]), np.array([])
 ###############################################################################
 def coordinates3D_MPI_v2(Gnx, Gny, Gnz, GLx, GLy, GLz,
-                      Px, Py, Pz, rank):
+                      Px, Py, Pz,rank):
     """
     Cria as coordenadas locais de um processo MPI em uma decomposição 3D,
     incluindo células fantasmas em TODAS as direções.
@@ -1970,118 +2100,3 @@ def coordinates3D_MPI_v2(Gnx, Gny, Gnz, GLx, GLy, GLz,
 
     return idx, coord
 ###############################################################################
-
-
-###############################################################################
-def coordinates3D_MPI(nx, ny, nz, Lx, Ly, Lz, 
-                      Gnx, Gny, Gnz, GLx, GLy, GLz, 
-                      rank, size):
-    """
-    Generate the grid coordinates with ghost cells only in X direction.
-    Cada processo recebe um pedaço no eixo X + células fantasmas.
-    """
-    dx = GLx / Gnx
-    dy = GLy / Gny
-    dz = GLz / Gnz
-
-    # Adicionar celulas fantasmas no eixo X:
-    if rank == 0:  
-        # ponta esquerda: ghost apenas à direita
-        nx_local = nx + 1
-        #locghostcell_x = 0
-    elif rank == size - 1:  
-        # ponta direita: ghost apenas à esquerda
-        nx_local = nx + 1
-        #locghostcell_x = rank * nx - 1
-    else:  
-        # processos no meio: ghost à esquerda e à direita
-        nx_local = nx + 2
-        #locghostcell_x = rank * nx - 1
-
-    # Construção das coordenadas locais
-    x = np.linspace(dx/2, Lx - dx/2, Gnx)   # eixo X global
-    y = np.linspace(dy/2, Ly - dy/2, ny)
-    z = np.linspace(dz/2, Lz - dz/2, nz)
-
-    #print(f"Rank {rank}: nx_local = {nx_local}, nx={nx}, ny = {ny}, nz = {nz}")
-    # Cortamos apenas a fatia de X que pertence a este processo
-    #x_local = x[locghostcell_x : min(locghostcell_x + nx_local, len(x))]
-    #nx_local = len(x_local)   
-
-    coord = np.zeros((nx_local * ny * nz, 3))
-    idx   = np.zeros((nx_local * ny * nz, 3), dtype=int)
-    #print(f"Rank {rank}: nx_local = {nx_local}, nx={nx}, ny = {ny}, nz = {nz}")
-    for k in range(nz):
-        for j in range(ny):
-            for i in range(1,nx_local+1):
-                idx1D = idx_3d_to_1d(i-1, j, k, nx_local, ny)
-                #i_aux = 2
-                
-                i_aux = i + nx - nx_local*(size-rank)
-                coord[idx1D, 0] = x[i_aux]
-                coord[idx1D, 1] = y[j]
-                coord[idx1D, 2] = z[k]
-                idx[idx1D, 0] = i_aux
-                idx[idx1D, 1] = j
-                idx[idx1D, 2] = k
-
-    print("coord: ", coord)
-    print("idx: ", idx)
-    #print(f"Coord shape: {coord.shape}, Idx shape: {idx.shape}, Rank: {rank}, Nx_local: {nx_local}")
-    
-    return idx, coord
-###############################################################################
-
-###############################################################################
-def troca_de_mensagens_MPI(comm, rank, size):
-
-    mensagem_enviada = f"Ola do processo {rank}"
-
-    if rank < size - 1:
-        comm.send(mensagem_enviada, dest=rank + 1, tag=0)
-
-    if rank > 0:
-        mensagem_recebida = comm.recv(source=rank - 1, tag=0)
-        print(f"[Rank {rank}] recebeu: '{mensagem_recebida}' do processo {rank - 1}")
-###############################################################################
-def M_Vizinhos1D(comm, rank, size):
-
-    dims = [size]
-    print(f"{dims}")
-    periods = [False]
-    cart = comm.Create_cart(dims, periods=periods, reorder=False)
-
-    coord = cart.Get_coords(rank)[0]
-
-    # Descobre vizinhos
-    src_left, dest_right = cart.Shift(0, +1)
-    src_right, dest_left = cart.Shift(0, -1)
-    
-    return (dest_left, dest_right)
-
-def Identifica_Faces(rank, size, Gny, Gnz, nx_local):
-    count = 0
-    total_faces = Gny * Gnz
-
-    face_direita = np.full(total_faces, -1, dtype=int)
-    face_esquerda = np.full(total_faces, -1, dtype=int)
-
-    if rank == 0 or rank == size:
-        nx_local = nx_local + 1
-    else:
-        nx_local = nx_local + 2
-
-    for k in range(Gnz):
-        for j in range(Gny):
-            if rank != size - 1:
-                face_direita[count] = nx_local * (count + 1)
-            if rank != 0:
-                face_esquerda[count] = (nx_local * (count + 1)) - nx_local
-            count += 1
-
-            # print(nx_local)
-
-    return face_direita, face_esquerda
-###############################################################################
-def get_local_coordinates(id,local_coord):
-    return local_coord[id,:]

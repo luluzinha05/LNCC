@@ -2,7 +2,7 @@
 import sys
 from numpy.linalg import solve
 from scipy.sparse.linalg import spsolve
-from tools import coordinates1D, coordinates2D, coordinates3D_MPI, compute_perm
+from tools import coordinates1D, coordinates2D, coordinates3D_MPI_v2, compute_perm
 from tools import compute_trans_1D, setup_system_1D
 from tools import compute_trans_2D, setup_system_2D
 from tools import compute_trans_3D, setup_system_3D
@@ -124,12 +124,22 @@ def slab3D(inputpar,fieldY=0.0,tolerance=1e-6, rank=0, size=1):
     dx = Lx / nx
     dy = Ly / ny
     dz = Lz / nz
+    
+    # Erro nx_local, ny_local, nz_local  
+    nx = nx / inputpar.Px
+    ny = ny / inputpar.Py
+    nz = nz / inputpar.Pz
 
-    idx, coord = coordinates3D_MPI(nx, ny, nz, Lx, Ly, Lz,
-                                   inputpar.mesh[0], inputpar.mesh[1], inputpar.mesh[2],   # Gnx, Gny, Gnz
+    print(nx, ny, nz)
+
+    idx, coord = coordinates3D_MPI_v2(inputpar.mesh[0], inputpar.mesh[1], inputpar.mesh[2],   # Gnx, Gny, Gnz
                                    inputpar.Dom[0], inputpar.Dom[1], inputpar.Dom[2],      # GLx, GLy, GLz
-                                   rank, size
+                                   inputpar.Px, inputpar.Py, inputpar.Pz, rank
                                   )
+    
+    print(coord.shape)
+
+    sys.exit()
     
     #imprimir o cord apos implementaçãodas ghostcells (for i < numero de processos    if rank==i  print processo i    imprimir a variavel cord)
     #for i in range(size):
