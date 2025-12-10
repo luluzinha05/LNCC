@@ -4,7 +4,7 @@ Beta parameter of the permeability field: 9.8692e-14
 Rho (strength) parameter of the permeability field: 1.0
 Water viscosity (mu): 1.0e-03
 Domain size: 100.0 100.0 1.0
-Computational mesh: 12 3 4
+Computational mesh: 12 12 12
 Bottom hole pressure (BHP): 101325.0
 Right side Dirichlet pressure: 0.0
 Left side Dirichlet pressure: 1000.0

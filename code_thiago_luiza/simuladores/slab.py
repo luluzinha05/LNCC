@@ -137,9 +137,10 @@ def slab3D(inputpar,fieldY=0.0,tolerance=1e-6, rank=0, size=1):
                                    inputpar.Px, inputpar.Py, inputpar.Pz, rank
                                   )
     
-    print(coord.shape)
-
-    sys.exit()
+    for i2 in range(0, size):
+        if rank == i2:
+            print(rank, coord.shape)
+            
     
     #imprimir o cord apos implementaçãodas ghostcells (for i < numero de processos    if rank==i  print processo i    imprimir a variavel cord)
     #for i in range(size):
@@ -170,7 +171,7 @@ def slab3D(inputpar,fieldY=0.0,tolerance=1e-6, rank=0, size=1):
 
     # Solve the linear system
     p_flat = spsolve(A, b)
-    p = p_flat.reshape((nx,ny,nz), order='F')
+    p = p_flat.reshape((int(nx), int(ny), int(nz)), order='F')
     
     # save the pressure field ================================
     pos = inputpar.positions

@@ -2058,7 +2058,7 @@ def M_Vizinhos1D(comm, rank, size):
     src_right, dest_left = cart.Shift(0, -1)
     
     return (dest_left, dest_right)
-
+###############################################################################
 def Identifica_Faces(rank, size, Gny, Gnz, nx_local):
     count = 0
     total_faces = Gny * Gnz
@@ -2085,3 +2085,36 @@ def Identifica_Faces(rank, size, Gny, Gnz, nx_local):
 ###############################################################################
 def get_local_coordinates(id,local_coord):
     return local_coord[id,:]
+###############################################################################
+def MPI_Vizinhos3D(nx, ny, nz, Px, Py, Pz, comm, rank, size):
+    dims = (Pz, Py, Px)
+    periods = (False, False, False)
+    cart = comm.Create_cart(dims = dims, periods = periods, reorder = False)
+
+    coord = cart.Get_coords(rank)[0]
+
+    # Direção X
+    x_minus, x_plus = cart.Shift(2, +1)
+
+    # Direção Y (dim = 1)
+    y_minus, y_plus = cart.Shift(1, +1)
+
+    # Direção Z (dim = 2)
+    z_minus, z_plus = cart.Shift(0, +1)
+
+    # vizinhos = {
+    #    "x_minus": x_minus,
+    #    "x_plus":  x_plus,
+    #    "y_minus": y_minus,
+    #    "y_plus":  y_plus,
+    #    "z_minus": z_minus,
+    #    "z_plus":  z_plus,
+    # }
+
+    # --- Shifts de índice para array 3D linearizado ---
+    # idx(i,j,k) = i + nx * (j + ny * k)
+    shift = (nx * ny,     # Δx
+             nx,          # Δy
+             1)           # Δz
+    
+    return (x_plus, x_minus, y_plus, y_minus, z_plus, z_minus)
