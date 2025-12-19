@@ -2033,6 +2033,67 @@ def coordinates3D_MPI(nx, ny, nz, Lx, Ly, Lz,
 ###############################################################################
 
 ###############################################################################
+def rank_to_coords(rank, Px, Py, Pz):
+    px = rank % Px
+    py = (rank // Px) % Py
+    pz = rank // (Px * Py)
+    return px, py, pz
+###############################################################################
+
+###############################################################################
+def coordinates3D_MPI_v2(Gnx, Gny, Gnz,
+                      GLx, GLy, GLz,
+                      Px, Py, Pz,
+                      rank):
+
+    dx = GLx / Gnx
+    dy = GLy / Gny
+    dz = GLz / Gnz
+
+    # Rank → coordenadas do processo
+    px, py, pz = rank_to_coords(rank, Px, Py, Pz)
+
+    # Tamanhos físicos locais
+    nx = Gnx // Px
+    ny = Gny // Py
+    nz = Gnz // Pz
+
+    # Sempre ghost em todas as direções
+    nx = nx + 2
+    ny = ny + 2
+    nz = nz + 2
+
+    # Offset global (sem ghost)
+    ox = px * nx
+    oy = py * ny
+    oz = pz * nz
+
+    coord = np.zeros((nx * ny * nz, 3))
+    idx   = np.zeros((nx * ny * nz, 3), dtype=int)
+
+    #def idx_3d_to_1d(i, j, k):
+    #    return i + nxL * (j + nyL * k)
+
+    for k in range(nz):
+        for j in range(ny):
+            for i in range(nx):
+
+                id1D = idx_3d_to_1d(i, j, k,nx,ny)
+
+                ig = ox + i - 1
+                jg = oy + j - 1
+                kg = oz + k - 1
+
+                coord[id1D, 0] = (ig + 0.5) * dx
+                coord[id1D, 1] = (jg + 0.5) * dy
+                coord[id1D, 2] = (kg + 0.5) * dz
+
+                idx[id1D, :] = [ig, jg, kg]
+
+    return idx,coord
+###############################################################################
+
+###############################################################################
 def troca_de_mensagens_MPI(comm, rank, size):
 
     mensagem_enviada = f"Ola do processo {rank}"
