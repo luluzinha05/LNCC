@@ -2179,3 +2179,43 @@ def MPI_Vizinhos3D(nx, ny, nz, Px, Py, Pz, comm, rank, size):
              1)           # Δz
     
     return (x_plus, x_minus, y_plus, y_minus, z_plus, z_minus)
+###############################################################################
+def MPI_SEND_Xminus(Px, Py, Pz, nx_local, ny_local, nz_local, vxsim, comm, rank, size):
+    count = 0
+
+    face_Xminus = np.zeros((nx_local * nz_local, 1))
+
+    for k in range(nz_local):
+        for j in range(ny_local):
+                face_Xminus[count] = vxsim[(nx_local * count) - 1]
+                count += 1
+
+    return face_Xminus
+###############################################################################
+def MPI_RECV_Xminus(Px, Py, Pz, nx_local, ny_local, nz_local, vxsim, face_Xminus, comm, rank, size):
+    count = 0
+
+    for k in range(nz_local):
+        for j in range(ny_local):
+                vxsim[(nx_local * count) + nx_local - j] = face_Xminus[count] 
+                count += 1
+
+    return face_Xminus
+###############################################################################
+def MPI_RECV_Xminus(Px, Py, Pz, nx_local, ny_local, nz_local,
+                    vxsim, face_Xminus, comm, rank, size):
+
+    count = 0
+    
+    for k in range(nz_local):            # Z
+        for j in range(ny_local):        # Y
+            # escreve na face esquerda (x = 0),
+            # mas desfaz o espelho em X
+            x = nx_local - 1
+
+            idx = k * (ny_local * nx_local) + j * nx_local + x
+            vxsim[idx] = face_Xminus[count]
+
+            count += 1
+
+    return vxsim

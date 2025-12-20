@@ -125,10 +125,10 @@ def slab3D(inputpar,fieldY=0.0,tolerance=1e-6, rank=0, size=1):
     dy = Ly / ny
     dz = Lz / nz
     
-    # Erro nx_local, ny_local, nz_local  
-    nx = nx / inputpar.Px
-    ny = ny / inputpar.Py
-    nz = nz / inputpar.Pz
+    # Refatorar para receber essas variaveis como argumentto ou retornar na saida da funcao 
+    nx = nx / inputpar.Px + 2
+    ny = ny / inputpar.Py + 2
+    nz = nz / inputpar.Pz + 2
 
     print(nx, ny, nz)
 
