@@ -9,7 +9,7 @@ from mpi4py import MPI
 from tools import input_simulation_parameters
 from tools import DirichletBC3D
 from simuladores.slab import slab3D
-from tools import run_advection_solver_3D
+from tools import run_advection_solver_3D_MPI
 from tools import InitialConditionOilStain
 
 from tools import troca_de_mensagens_MPI, M_Vizinhos1D, Identifica_Faces, get_local_coordinates, MPI_Vizinhos3D
@@ -30,7 +30,7 @@ internal_simulpar = input_simulation_parameters('simulation_input2.in')
 internal_simulpar.BC = DirichletBC3D
 internal_simulpar.Px = 4
 internal_simulpar.Py = 1
-internal_simulpar.Pz = 2
+internal_simulpar.Pz = 1
 
 N_div = internal_simulpar.Px * internal_simulpar.Py * internal_simulpar.Pz
 
@@ -53,18 +53,9 @@ if Gnz % internal_simulpar.Pz == 0:
             nz_local = int (Gnz // internal_simulpar.Pz) + 2
 
 # x plus := direita, x_minus := esquerda, y_plus := trás, y_minus := frente, z_plus := cima, z_minus := baixo
-x_plus = -1
-x_minus = -1
-y_plus = -1 
-y_minus = -1 
-z_plus = -1 
-z_minus = -1
+MPI_vizinhos = -1 * np.ones(shape = (6, 0))
 
-x_plus, x_minus, y_plus, y_minus, z_plus, z_minus = MPI_Vizinhos3D(Gnx, Gny, Gnz, internal_simulpar.Px, internal_simulpar.Py, internal_simulpar.Pz, comm, rank, size)
-
-for i in range(size):
-    if rank == i:
-        print(f"{rank}: x: {x_plus, x_minus}, y: {y_plus, y_minus}, z: {z_plus, z_minus}")
+MPI_vizinhos = MPI_Vizinhos3D(Gnx, Gny, Gnz, internal_simulpar.Px, internal_simulpar.Py, internal_simulpar.Pz, comm, rank, size)
 ####################################################################
 # Loop que percorre os processos
 ####################################################################
@@ -84,8 +75,10 @@ for i in range(N_div):
         tf = 60 * day
         IC = InitialConditionOilStain(20, 80, 20, 80, 0, nz, GLx/nx, GLy/ny, GLz/nz)
 
-        x, y, z, c_hist, dt, nt = run_advection_solver_3D(
+        x, y, z, c_hist, dt, nt = run_advection_solver_3D_MPI(
             GLx, GLy, GLz, nx, ny, nz,
-            ux=vxsim, uy=vysim, uz=vzsim,
-            cfl=cfl, tf=tf, IC=IC
+            vxsim, vysim, vzsim,
+            cfl, tf, IC, internal_simulpar.Px, internal_simulpar.Py, 
+            internal_simulpar.Pz, nx_local, ny_local, nz_local, 
+            MPI_vizinhos, comm, rank, size
         )

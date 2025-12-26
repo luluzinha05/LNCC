@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.sparse import lil_matrix
 from ipywidgets import interact, IntSlider
+import sys
 
 # type: ignore
 #import BC_IC_tools as BC_IC
@@ -1776,6 +1777,8 @@ def run_advection_solver_3D(Lx, Ly, Lz, nx, ny, nz, ux, uy, uz, cfl, tf, IC):
     
     vel_max = max(np.max(np.abs(ux)), np.max(np.abs(uy)), np.max(np.abs(uz)))
     dt = cfl * min(dx, dy, dz) / max(vel_max, 1e-20)
+    # temos que incluir aqui depois uma verificação coletiva sobre dx dy e dz
+
     nt = int(np.ceil(tf / dt))
     dt = tf / nt
 
@@ -1789,6 +1792,40 @@ def run_advection_solver_3D(Lx, Ly, Lz, nx, ny, nz, ux, uy, uz, cfl, tf, IC):
         
     return x, y, z, c_hist, dt, nt
 ###############################################################################
+def run_advection_solver_3D_MPI(Lx, Ly, Lz, nx, ny, nz, ux, uy, uz, cfl, tf, IC, Px, Py, Pz, nx_local, ny_local, nz_local, 
+                                MPI_vizinhos, comm, rank, size):
+    (x, y, z), dx, dy, dz = initialize_domain_3D(Lx, Ly, Lz, nx, ny, nz)
+    
+    vel_max = max(np.max(np.abs(ux)), np.max(np.abs(uy)), np.max(np.abs(uz)))
+    dt = cfl * min(dx, dy, dz) / max(vel_max, 1e-20)
+    # temos que incluir aqui depois uma verificação coletiva sobre dx dy e dz
+
+    nt = int(np.ceil(tf / dt))
+    dt = tf / nt
+
+    c = IC.create_apply(nx,ny,nz)
+    c_hist = [c[1:-1, 1:-1, 1:-1].copy()]
+
+    tag = 0
+    dest = int(MPI_vizinhos[1])
+    source = MPI_vizinhos[0]
+
+    for _ in range(nt):
+        if rank == 0: 
+            apply_ghost_cells_3D(c,1.0,0.0)
+
+        aux = MPI_SEND_Xminus(nx_local, ny_local, nz_local, ux.ravel())
+        comm.send(aux, MPI.DOUBLE, dest = dest, tag = tag)    
+        # MPI_vizinhos deve ser previamente inicializado
+
+        comm.recv(aux, source = source, tag = tag)
+
+        ux = MPI_RECV_Xminus(nx_local, ny_local, nz_local, ux, aux)
+
+        c = upwind_step_3Dvec(c, ux, uy, uz, dt, dx, dy, dz)
+        c_hist.append(c[1:-1, 1:-1, 1:-1].copy())
+        
+    return x, y, z, c_hist, dt, nt
 
 ###############################################################################
 def plot_solution_3D_slice(X, Y, K, c_hist, dt, n, z_idx,
@@ -2180,42 +2217,34 @@ def MPI_Vizinhos3D(nx, ny, nz, Px, Py, Pz, comm, rank, size):
     
     return (x_plus, x_minus, y_plus, y_minus, z_plus, z_minus)
 ###############################################################################
-def MPI_SEND_Xminus(Px, Py, Pz, nx_local, ny_local, nz_local, vxsim, comm, rank, size):
-    count = 0
-
-    face_Xminus = np.zeros((nx_local * nz_local, 1))
-
-    for k in range(nz_local):
-        for j in range(ny_local):
-                face_Xminus[count] = vxsim[(nx_local * count) - 1]
-                count += 1
-
-    return face_Xminus
-###############################################################################
-def MPI_RECV_Xminus(Px, Py, Pz, nx_local, ny_local, nz_local, vxsim, face_Xminus, comm, rank, size):
+def MPI_SEND_Xminus(nx_local, ny_local, nz_local, vxsim):
+    face = np.zeros((ny_local * nz_local, 1))
     count = 0
 
     for k in range(nz_local):
         for j in range(ny_local):
-                vxsim[(nx_local * count) + nx_local - j] = face_Xminus[count] 
-                count += 1
+            idx = (k * ny_local + j) * nx_local + (nx_local - 1)
+            face[count] = vxsim[idx]
+            count += 1
 
-    return face_Xminus
+    return face
 ###############################################################################
-def MPI_RECV_Xminus(Px, Py, Pz, nx_local, ny_local, nz_local,
-                    vxsim, face_Xminus, comm, rank, size):
+def MPI_RECV_Xminus(nx_local, ny_local, nz_local,
+                    vxsim, face_Xminus):
 
     count = 0
-    
-    for k in range(nz_local):            # Z
-        for j in range(ny_local):        # Y
-            # escreve na face esquerda (x = 0),
-            # mas desfaz o espelho em X
-            x = nx_local - 1
+    for k in range(nz_local):          # Z
+        for j in range(ny_local):      # Y do buffer
+            y = ny_local - 1 - j       # desfaz espelho em Y
 
-            idx = k * (ny_local * nx_local) + j * nx_local + x
+            # índice físico no volume [z][y][x]
+            idx = (
+                k * (ny_local * nx_local)
+                + y * nx_local
+                + (nx_local)       # face X-, removemos o -1
+            )
+
             vxsim[idx] = face_Xminus[count]
-
             count += 1
 
     return vxsim
