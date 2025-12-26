@@ -1808,19 +1808,21 @@ def run_advection_solver_3D_MPI(Lx, Ly, Lz, nx, ny, nz, ux, uy, uz, cfl, tf, IC,
 
     tag = 0
     dest = int(MPI_vizinhos[1])
-    source = MPI_vizinhos[0]
+    source = int(MPI_vizinhos[0])
+
+    print(type(dest))
 
     for _ in range(nt):
         if rank == 0: 
             apply_ghost_cells_3D(c,1.0,0.0)
 
         aux = MPI_SEND_Xminus(nx_local, ny_local, nz_local, ux.ravel())
-        comm.send(aux, MPI.DOUBLE, dest = dest, tag = tag)    
+        comm.Send([aux, MPI.DOUBLE], dest = dest, tag = tag)    
         # MPI_vizinhos deve ser previamente inicializado
 
-        comm.recv(aux, source = source, tag = tag)
+        comm.Recv([aux, MPI.DOUBLE], source = source, tag = tag)
 
-        ux = MPI_RECV_Xminus(nx_local, ny_local, nz_local, ux, aux)
+        MPI_RECV_Xminus(nx_local, ny_local, nz_local, ux, aux)
 
         c = upwind_step_3Dvec(c, ux, uy, uz, dt, dx, dy, dz)
         c_hist.append(c[1:-1, 1:-1, 1:-1].copy())
@@ -2229,7 +2231,7 @@ def MPI_SEND_Xminus(nx_local, ny_local, nz_local, vxsim):
 
     return face
 ###############################################################################
-def MPI_RECV_Xminus(nx_local, ny_local, nz_local,
+def MPI_RECV_Xminus_OLD(nx_local, ny_local, nz_local,
                     vxsim, face_Xminus):
 
     count = 0
@@ -2248,3 +2250,15 @@ def MPI_RECV_Xminus(nx_local, ny_local, nz_local,
             count += 1
 
     return vxsim
+
+def MPI_RECV_Xminus(nx_local, ny_local, nz_local,
+                    vxsim, face_Xminus):
+
+    count = 0
+    for k in range(nz_local):          # Z
+        for j in range(ny_local):      # Y do buffer
+            y = ny_local - 1 - j       # desfaz espelho em Y    
+            vxsim[nx_local - 1, y, k] = face_Xminus[count]
+            count += 1
+
+    return 
